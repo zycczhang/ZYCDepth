@@ -1,0 +1,7 @@
+<Solution>
+  <Configurations>
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Project Path="ZYCDepth/ZYCDepth.vcxproj" Id="dbb48371-e22e-4b3f-934b-7f4cec64c747" />
+</Solution>

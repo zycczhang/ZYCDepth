@@ -1,0 +1,8 @@
+﻿{
+  "name": "dsoonwin",
+  "version": "1.0.0",
+  "builtin-baseline": "3b3777fa3cd0c99a3ceba914e71ba75cf43d4219",
+  "dependencies": [
+    "uwebsockets"
+  ]
+}

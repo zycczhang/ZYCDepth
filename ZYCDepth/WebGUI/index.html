@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZYCC AI Game Automation</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=Fira+Code:wght@400;500&display=swap"
+        rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+
+    <style>
+        :root {
+            --bg-dark: #0a0b10;
+            --card-bg: #16181d;
+            --accent: #00f2ff;
+            --accent-glow: rgba(0, 242, 255, 0.3);
+            --text-main: #e2e8f0;
+            --text-dim: #94a3b8;
+            --border-color: #2d3748;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 顶部导航 */
+        .navbar {
+            background: var(--card-bg);
+            border-bottom: 1px solid var(--border-color);
+            padding: 0.5rem 1.5rem;
+        }
+
+        .brand {
+            font-weight: 600;
+            font-size: 1.1rem;
+            color: var(--accent);
+            letter-spacing: 1px;
+        }
+
+        /* 主布局 */
+        .main-container {
+            display: grid;
+            grid-template-columns: 300px 1fr 320px;
+            grid-template-rows: 1fr 220px;
+            gap: 12px;
+            padding: 12px;
+            height: calc(100vh - 56px);
+        }
+
+        .panel {
+            background: var(--card-bg);
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .panel-header {
+            padding: 10px 15px;
+            background: rgba(255, 255, 255, 0.03);
+            border-bottom: 1px solid var(--border-color);
+            font-weight: 600;
+            font-size: 0.85rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* 侧边设置 */
+        .settings-panel {
+            grid-row: 1 / 3;
+        }
+
+        .form-label {
+            color: var(--text-dim);
+            font-size: 0.75rem;
+            margin-bottom: 4px;
+        }
+
+        .form-select,
+        .form-control {
+            background: #1f2229;
+            border: 1px solid var(--border-color);
+            color: white;
+            font-size: 0.85rem;
+        }
+
+        /* 性能仪表盘 */
+        .metric-card {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 6px;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-left: 3px solid var(--accent);
+        }
+
+        .metric-val {
+            font-family: 'Fira Code';
+            font-size: 1.1rem;
+            color: var(--accent);
+        }
+
+        .metric-label {
+            font-size: 0.7rem;
+            color: var(--text-dim);
+            text-transform: uppercase;
+        }
+
+        /* 3D视图区 */
+        .viewport-panel {
+            grid-column: 2 / 3;
+        }
+
+        #three-canvas-container {
+            flex-grow: 1;
+            width: 100%;
+            height: 100%;
+            background: #000;
+        }
+
+        /* 预览区 */
+        .streams-panel {
+            grid-column: 3 / 4;
+            grid-row: 1 / 2;
+        }
+
+        .preview-box {
+            position: relative;
+            margin: 8px;
+            border-radius: 6px;
+            overflow: hidden;
+            border: 1px solid #333;
+            background: #000;
+        }
+
+        .preview-box small {
+            position: absolute;
+            top: 5px;
+            left: 5px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 2px 6px;
+            font-size: 9px;
+            border-radius: 3px;
+            z-index: 10;
+        }
+
+        #preview-raw,
+        #preview-depth {
+            width: 100%;
+            aspect-ratio: 16/9;
+            object-fit: contain;
+        }
+
+        /* 日志区 */
+        .log-panel {
+            grid-column: 2 / 4;
+            grid-row: 2 / 3;
+        }
+
+        #log-container {
+            flex-grow: 1;
+            padding: 10px;
+            font-family: 'Fira Code', monospace;
+            font-size: 11px;
+            overflow-y: auto;
+            background: #0d0e12;
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.7rem;
+            padding: 3px 10px;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+        }
+
+        .dot-online {
+            background: #00ff88;
+            box-shadow: 0 0 8px #00ff88;
+        }
+
+        .dot-offline {
+            background: #ff4444;
+        }
+    </style>
+</head>
+
+<body>
+    <nav class="navbar">
+        <div class="brand"><i class="bi bi-gpu-card me-2"></i>ZYC</div>
+        <div class="status-badge">
+            <div id="ws-status-dot" class="dot dot-offline"></div>
+            <span id="ws-status-text">DISCONNECTED</span>
+        </div>
+    </nav>
+
+    <div class="main-container">
+        <!-- 侧边栏：控制与性能 -->
+        <aside class="panel settings-panel">
+            <div class="panel-header">控制台配置 <i class="bi bi-sliders"></i></div>
+            <div class="p-3">
+                <!-- 性能监测数据区 -->
+                <div class="metric-card">
+                    <div class="row text-center">
+                        <div class="col-6 border-end border-secondary">
+                            <div class="metric-label">截图耗时</div>
+                            <div class="metric-val"><span id="cap-time">0</span><small
+                                    style="font-size:0.6rem">ms</small></div>
+                        </div>
+                        <div class="col-6">
+                            <div class="metric-label">推理耗时</div>
+                            <div class="metric-val"><span id="inf-time">0</span><small
+                                    style="font-size:0.6rem">ms</small></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-check form-switch mb-4 mt-3">
+                    <input class="form-check-input" type="checkbox" id="mapping-switch" onchange="toggleMapping()">
+                    <label class="form-check-label ms-2" for="mapping-switch">开启建图</label>
+                </div>
+
+                <div class="form-check form-switch mb-4 mt-3">
+                    <input class="form-check-input" type="checkbox" id="Inference-switch" onchange="toggleInference()">
+                    <label class="form-check-label ms-2" for="Inference-switch">开启推理</label>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">目标窗口</label>
+                    <select class="form-select" id="window-list" onmousedown="refreshWindows()"
+                        onchange="applyWindow()">
+                        <option value="" disabled selected>-- 点击扫描 --</option>
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">截图技术</label>
+                    <select class="form-select" id="capture-method" onchange="updateConfig()">
+                        <option value="0">GDI (兼容)</option>
+                        <option value="1">DirectX (高性能)</option>
+                        <option value="2">WinGC (更高性能)</option>
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">采集频率: <span id="fps-val">30</span> FPS</label>
+                    <input type="range" class="form-range" min="1" max="60" value="30" id="capture-fps"
+                        oninput="document.getElementById('fps-val').innerText=this.value" onchange="updateConfig()">
+                </div>
+            </div>
+        </aside>
+
+        <!-- 3D 栅格地图 -->
+        <main class="panel viewport-panel">
+            <div class="panel-header">
+                3D重建图
+                <div class="btn-group btn-group-sm">
+                    <button class="btn btn-outline-secondary" onclick="resetCamera()">重置视角</button>
+                    <button class="btn btn-outline-danger" onclick="clearMap()">清除数据</button>
+                </div>
+            </div>
+            <div id="three-canvas-container"></div>
+        </main>
+
+        <!-- 视频预览 -->
+        <section class="panel streams-panel">
+            <div class="panel-header">实时图像流</div>
+            <div class="preview-box">
+                <small>GAME RAW</small>
+                <img id="preview-raw" src="" alt="等待输入...">
+            </div>
+            <div class="preview-box">
+                <small>AI DEPTH (Small 24.8M)</small>
+                <img id="preview-depth" src="" alt="等待深度图...">
+            </div>
+        </section>
+
+        <!-- 日志终端 -->
+        <footer class="panel log-panel">
+            <div class="panel-header">系统运行日志 <i class="bi bi-terminal"></i></div>
+            <div id="log-container"></div>
+        </footer>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <script>
+        let ws;
+        let scene, camera, renderer, controls;
+        let pointCloud, pointsGeometry; // 全局变量，方便更新
+        const colorCanvas = document.createElement('canvas');
+        const colorCtx = colorCanvas.getContext('2d', { willReadFrequently: true });
+        let lastRawImage = null; // 存储最新的原始图对象
+        const MAX_POINTS = 504 * 504;   // 对应模型输出分辨率
+        // --- WebSocket 核心逻辑 ---
+        function connect() {
+            // 根据你的实际 C++程序 地址修改
+            ws = new WebSocket('ws://localhost:9001');
+            // 【关键】必须设置二进制类型为 arraybuffer
+            ws.binaryType = 'arraybuffer';
+            ws.onopen = () => {
+                document.getElementById('ws-status-dot').className = 'dot dot-online';
+                document.getElementById('ws-status-text').innerText = 'CONNECTED';
+                addLog(0, "与后端 C++ WebSocket 服务器连接成功");
+            };
+
+            ws.onmessage = (event) => {
+
+                if (event.data instanceof ArrayBuffer) {
+                    // 调用你写的还原函数
+                    updatePointCloud(event.data);
+
+                    // 【关键修复】处理完二进制后立即返回，不要执行下面的 JSON.parse
+                    return;
+                }
+
+                const msg = JSON.parse(event.data);
+
+                switch (msg.type) {
+                    case 'init_config':
+                        // 1. 处理后端发来的初始化配置
+                        console.log("收到初始化配置:", msg);
+                        if (msg.method !== undefined) document.getElementById('capture-method').value = msg.method;
+                        if (msg.capturefps !== undefined) {
+                            document.getElementById('capture-fps').value = msg.capturefps;
+                            document.getElementById('fps-val').innerText = msg.capturefps;
+                        }
+                        if (msg.window_name) {
+                            const select = document.getElementById('window-list');
+                            const opt = new Option(msg.window_name, msg.window_name, true, true);
+                            select.appendChild(opt);
+                        }
+                        addLog(0, `配置同步成功: ${msg.window_name || '未选择窗口'}`);
+                        break;
+
+                    case 'frame_update':
+                        // 2. 更新图像流和耗时统计
+                        if (msg.frame_type === 'raw') {
+                            const img = document.getElementById('preview-raw');
+                            img.src = msg.data; // 更新预览
+
+                            // --- 新增：将图片同步到隐藏 Canvas 以便读取像素 ---
+                            const tempImg = new Image();
+                            tempImg.onload = () => {
+                                colorCanvas.width = tempImg.width;
+                                colorCanvas.height = tempImg.height;
+                                colorCtx.drawImage(tempImg, 0, 0);
+                                lastRawImage = colorCtx.getImageData(0, 0, colorCanvas.width, colorCanvas.height).data;
+                            };
+                            tempImg.src = msg.data;
+                            if (msg.capture_time !== undefined) {
+                                document.getElementById('cap-time').innerText = msg.capture_time.toFixed(1);
+                            }
+                        } else if (msg.frame_type === 'depth') {
+                            document.getElementById('preview-depth').src = msg.data;
+                            if (msg.infer_time !== undefined) {
+                                document.getElementById('inf-time').innerText = msg.infer_time.toFixed(1);
+                            }
+                        }
+                        break;
+
+                    case 'window_list':
+                        const select = document.getElementById('window-list');
+                        const current = select.value;
+                        select.innerHTML = '<option value="" disabled>-- 选择目标窗口 --</option>';
+                        msg.windows.forEach(win => {
+                            const opt = new Option(win, win);
+                            if (win === current) opt.selected = true;
+                            select.appendChild(opt);
+                        });
+                        break;
+
+                    case 'log':
+                        addLog(msg.level, msg.msg, msg.time);
+                        break;
+                }
+            };
+
+            ws.onclose = () => {
+                document.getElementById('ws-status-dot').className = 'dot dot-offline';
+                document.getElementById('ws-status-text').innerText = 'DISCONNECTED (RETRYING...)';
+                setTimeout(connect, 2000);
+            };
+        }
+
+
+        // --- 点云还原核心算法 ---
+        function updatePointCloud(buffer) {
+            if (!pointCloud || !lastRawImage) return;
+
+            const header = new DataView(buffer, 0, 128);
+            const width = header.getInt32(4, true);  // 深度图宽度 (504)
+            const height = header.getInt32(8, true); // 深度图高度 (504)
+            const fx = header.getFloat32(12, true);
+            const cx = header.getFloat32(20, true);
+            const fy = header.getFloat32(28, true);
+            const cy = header.getFloat32(32, true);
+
+            const depthData = new Float32Array(buffer, 128);
+            const positions = pointsGeometry.attributes.position.array;
+            const colors = pointsGeometry.attributes.color.array; // 【新增】获取颜色属性数组
+
+            // 计算深度图与原图的比例（因为模型输出 504x504，原图可能是 1920x1080）
+            const scaleX = colorCanvas.width / width;
+            const scaleY = colorCanvas.height / height;
+
+            let pointIdx = 0;
+            const stride = 2;
+
+            for (let v = 0; v < height; v += stride) {
+                for (let u = 0; u < width; u += stride) {
+                    const z = depthData[v * width + u];
+
+                    if (z > 0.1 && z < 50.0) {
+                        // 1. 设置坐标
+                        positions[pointIdx * 3] = (u - cx) * z / fx;
+                        positions[pointIdx * 3 + 1] = -(v - cy) * z / fy;
+                        positions[pointIdx * 3 + 2] = -z;
+
+                        // 2. 采样颜色 【新增核心】
+                        // 找到原图中对应的像素位置
+                        const imgU = Math.floor(u * scaleX);
+                        const imgV = Math.floor(v * scaleY);
+                        const rgbaIdx = (imgV * colorCanvas.width + imgU) * 4;
+
+                        // 将 0-255 映射到 0.0-1.0
+                        colors[pointIdx * 3] = lastRawImage[rgbaIdx] / 255.0;     // R
+                        colors[pointIdx * 3 + 1] = lastRawImage[rgbaIdx + 1] / 255.0; // G
+                        colors[pointIdx * 3 + 2] = lastRawImage[rgbaIdx + 2] / 255.0; // B
+
+                        pointIdx++;
+                    }
+                }
+            }
+
+            pointsGeometry.setDrawRange(0, pointIdx);
+            pointsGeometry.attributes.position.needsUpdate = true;
+            pointsGeometry.attributes.color.needsUpdate = true; // 【关键】通知更新颜色
+        }
+
+        // --- 控制交互 ---
+        function toggleMapping() {
+            const state = document.getElementById('mapping-switch').checked;
+            ws.send(JSON.stringify({ type: 'toggle_mapping', state: state }));
+        }
+
+        function toggleInference() {
+            const state = document.getElementById('Inference-switch').checked;
+            ws.send(JSON.stringify({ type: 'toggle_Inference', state: state }));
+        }
+
+        function updateConfig() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'set_capture_config',
+                    method: parseInt(document.getElementById('capture-method').value),
+                    capture_fps: parseInt(document.getElementById('capture-fps').value),
+                    window_name: document.getElementById('window-list').value
+                }));
+            }
+        }
+
+        function refreshWindows() {
+            if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'get_window_list' }));
+        }
+
+        function applyWindow() {
+            updateConfig();
+            document.getElementById('window-list').blur();
+        }
+
+        // --- UI 辅助 ---
+        function addLog(level, text, time = '') {
+            const container = document.getElementById('log-container');
+            const div = document.createElement('div');
+            const color = level === 2 ? '#ff5252' : (level === 1 ? '#ffab00' : '#00f2ff');
+            div.style.color = color;
+            div.style.marginBottom = '2px';
+            div.innerHTML = `<small style="opacity:0.4">[${time || new Date().toLocaleTimeString()}]</small> ${text}`;
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        // --- Three.js 初始化 ---
+        function initThree() {
+            const container = document.getElementById('three-canvas-container');
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(70, container.clientWidth / container.clientHeight, 0.1, 2000);
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            container.appendChild(renderer.domElement);
+            // 坐标网格
+            const grid = new THREE.GridHelper(100, 50, 0x00f2ff, 0x222222);
+            scene.add(grid);
+            // 初始化点云物体
+            pointsGeometry = new THREE.BufferGeometry();
+            const positions = new Float32Array(MAX_POINTS * 3);
+            const colors = new Float32Array(MAX_POINTS * 3); // 【新增】颜色数组
+
+            pointsGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            pointsGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3)); // 【新增】
+            const pointsMaterial = new THREE.PointsMaterial({
+                size: 0.1,
+                vertexColors: true, // 【关键】启用顶点颜色
+                transparent: true,
+                opacity: 0.9
+            });
+            pointCloud = new THREE.Points(pointsGeometry, pointsMaterial);
+            scene.add(pointCloud);
+            camera.position.set(0, 10, 20); // 调整初始视角，方便看到还原的点
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            function animate() {
+                requestAnimationFrame(animate);
+                controls.update();
+                renderer.render(scene, camera);
+            }
+            animate();
+        }
+
+        window.addEventListener('resize', () => {
+            const container = document.getElementById('three-canvas-container');
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        });
+
+        initThree();
+        connect();
+    </script>
+</body>
+
+</html>
